@@ -79,9 +79,3 @@ tzdata==2024.1
 urllib3==2.2.3
 watchdog==4.0.2
 yarl==1.11.1
-seaborn-0.13.2
-patsy-0.5.6 
-plotly-5.24.1 
-plotly.express-0.4.1 
-scipy-1.14.1 
-statsmodels-0.14.3
