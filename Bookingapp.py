@@ -56,7 +56,7 @@ with tabs[0]:
 
     # Check if selected date is blocked or weekend
     if is_blocked_or_weekend(date):
-        if date.date() in blocked_dates:
+        if date in blocked_dates:
             st.error(f"The meeting room is unavailable on {date.strftime('%A, %B %d, %Y')} due to a blocked date.")
         else:
             st.error(f"The meeting room is closed on {date.strftime('%A, %B %d, %Y')} (weekend).")
