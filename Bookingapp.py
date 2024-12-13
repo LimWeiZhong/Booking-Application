@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import traceback
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Define available meeting rooms
 meeting_rooms = ["Room A", "Room B", "Room C"]
@@ -62,6 +65,33 @@ def log_transaction(action, room, date, start_time, end_time, user):
     transaction_log = pd.concat([transaction_log, new_log], ignore_index=True)
     transaction_log.to_csv("transaction_log.csv", index=False)
 
+# Function to send a no-reply email
+def send_email(subject, body, to_email):
+    try:
+        # Email credentials
+        sender_email = "k7510473@gmail.com"  # Replace with your email
+        sender_password = "p@ssw0rd"  # Replace with your email password or app password
+        smtp_server = "smtp.gmail.com"  # Replace with your SMTP server (e.g., smtp.gmail.com)
+        smtp_port = 587  # Port for sending email via TLS
+
+        # Create the email message
+        message = MIMEMultipart()
+        message["From"] = sender_email
+        message["To"] = to_email
+        message["Subject"] = subject
+
+        # Attach the body
+        message.attach(MIMEText(body, "plain"))
+
+        # Connect to the SMTP server and send the email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()  # Secure the connection
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, message.as_string())
+
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
 # Streamlit Interface
 image_path = "images/background.jpg"
 st.set_page_config(
@@ -97,6 +127,7 @@ with tabs[0]:
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         end_time = st.selectbox("End Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         booked_by = st.text_input("Your Name")
+        user_email = st.text_input("Your Email Address")
 
         if st.button("Book Room"):
             if not start_time or not end_time:
@@ -105,6 +136,8 @@ with tabs[0]:
                 st.error("End time must be after start time.")
             elif not booked_by.strip():
                 st.error("Please enter your name.")
+            elif not user_email.strip() or '@' not in user_email:
+                st.error("Please enter a valid email address.")
             else:
                 start_datetime = datetime.combine(date, start_time)
                 end_datetime = datetime.combine(date, end_time)
@@ -126,6 +159,12 @@ with tabs[0]:
                     bookings = pd.concat([bookings, new_booking], ignore_index=True)
                     bookings.to_csv("bookings.csv", index=False)
                     log_transaction("Booking", room, date.strftime('%Y-%m-%d'), start_datetime, end_datetime, booked_by)
+                    
+                    # Send the no-reply email to the user
+                    email_subject = f"Meeting Room Booking Confirmation - {room}"
+                    email_body = f"Hello {booked_by},\n\nYour booking for {room} on {date.strftime('%A, %B %d, %Y')} from {convert_to_readable_time(start_time)} to {convert_to_readable_time(end_time)} has been confirmed.\n\nBest Regards,\nMeeting Room Booking System"
+                    send_email(email_subject, email_body, user_email)
+                    
                     st.success("Room booked successfully!")
 
 # Second Tab: Edit or Cancel Booking
