@@ -65,7 +65,7 @@ with tabs[0]:
             date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
 
             # Drop the 'Date' column and reset index to remove the default index column
-            st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
+            st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)  # This will not display the index column
 
         # Input for booking start and end times
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
@@ -100,6 +100,7 @@ with tabs[0]:
                     bookings = pd.concat([bookings, new_booking], ignore_index=True)
                     bookings.to_csv("bookings.csv", index=False)
                     st.success("Room booked successfully!")
+                    st.experimental_rerun()
 
 # Second tab: Edit or Cancel Booking
 with tabs[1]:
@@ -119,7 +120,7 @@ with tabs[1]:
 
         st.subheader("Existing Bookings")
         # Display existing bookings without the 'Date' column using st.dataframe() or st.table() after resetting the index
-        st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
+        st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)  # This will not display the index column
 
         booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booked By'].tolist())
 
@@ -152,6 +153,7 @@ with tabs[1]:
                         bookings.loc[bookings['Booked By'] == booking_to_edit, ['Start Time', 'End Time', 'Booked By']] = [start_datetime, end_datetime, new_booked_by]
                         bookings.to_csv("bookings.csv", index=False)
                         st.success("Booking updated successfully!")
+                        st.experimental_rerun()
                     else:
                         st.error(f"New time conflicts with another booking during the selected time.")
 
@@ -160,3 +162,4 @@ with tabs[1]:
                     bookings = bookings[bookings['Booked By'] != booking_to_edit]
                     bookings.to_csv("bookings.csv", index=False)
                     st.success(f"Booking for {booking_to_edit} has been canceled.")
+                    st.experimental_rerun()
