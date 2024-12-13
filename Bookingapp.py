@@ -70,7 +70,7 @@ def send_email(subject, body, to_email):
     try:
         # Email credentials
         sender_email = "k7510473@gmail.com"  # Replace with your email
-        sender_password = "p@ssw0rd"  # Replace with your email password or app password
+        sender_password = "P@ssw0rd0dead"  # Replace with your email password or app password
         smtp_server = "smtp.gmail.com"  # Replace with your SMTP server (e.g., smtp.gmail.com)
         smtp_port = 587  # Port for sending email via TLS
 
