@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import traceback
 
 # Email Configuration
-EMAIL_ADDRESS = "k7510473@gmail.com"  # Replace with your Gmail address
-EMAIL_PASSWORD = "p@ssw0rd"   # Replace with your Gmail app password
+EMAIL_ADDRESS = "lim_wei_zhong@hotmail.com"  # Replace with your Gmail address
+EMAIL_PASSWORD = "d81c655b0deadtitan"   # Replace with your Gmail app password
 
 # Define available meeting rooms
 meeting_rooms = ["Room A", "Room B", "Room C"]
@@ -52,7 +53,6 @@ def is_blocked_or_weekend(date):
         return True
     return False
 
-# Function to send email notification
 def send_email_notification(action, room, date, start_time, end_time, user, recipient_email):
     subject = "New Booking System Notification"
     body = f"""
@@ -75,14 +75,16 @@ def send_email_notification(action, room, date, start_time, end_time, user, reci
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    # Send email
     try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())
+        # Connect to the Outlook/Hotmail SMTP server
+        with smtplib.SMTP('smtp-mail.outlook.com', 587) as server:
+            server.starttls()  # Secure the connection using TLS
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)  # Login with your Hotmail/Outlook email and app password
+            server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())  # Send the email
+        print(f"Email sent successfully to {recipient_email}")  # Debug message for success
     except Exception as e:
-        print(f"Failed to send email notification: {e}")
+        print(f"Failed to send email notification: {e}")  # Debug message for failure
+        print(traceback.format_exc())  # Print detailed traceback for debugging
 
 # Function to log transactions
 def log_transaction(action, room, date, start_time, end_time, user, recipient_email):
