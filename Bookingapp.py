@@ -65,7 +65,7 @@ with tabs[0]:
             date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
 
             # Drop the 'Date' column and reset index to remove the default index column
-            st.dataframe(date_bookings.drop(columns=['Date']).reset_index(drop=True))  # This will not display the index column
+            st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
 
         # Input for booking start and end times
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
@@ -119,7 +119,7 @@ with tabs[1]:
 
         st.subheader("Existing Bookings")
         # Display existing bookings without the 'Date' column using st.dataframe() or st.table() after resetting the index
-        st.dataframe(date_bookings.drop(columns=['Date']).reset_index(drop=True))  # This will not display the index column
+        st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
 
         booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booked By'].tolist())
 
