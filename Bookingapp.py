@@ -173,12 +173,3 @@ with tabs[1]:
                     bookings.to_csv("bookings.csv", index=False)
                     log_transaction("Cancellation", selected_booking['Room'], date.strftime('%Y-%m-%d'), selected_booking['Start Time'], selected_booking['End Time'], booking_to_edit)
                     st.success(f"Booking for {booking_to_edit} has been canceled.")
-
-# Third Tab: Admin
-with tabs[2]:
-    st.title("Admin Page")
-    st.subheader("Transaction History")
-    st.dataframe(transaction_log, hide_index=True)
-
-    csv = transaction_log.to_csv(index=False)
-    st.download_button(label="Download Transaction History", data=csv, file_name="transaction_log.csv", mime="text/csv")
