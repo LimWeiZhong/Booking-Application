@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import time  # For smoother user experience with reload
 
 # Define available meeting rooms
 meeting_rooms = ["Room A", "Room B", "Room C"]
@@ -30,10 +29,6 @@ def is_blocked_or_weekend(date):
     if date.weekday() >= 5:  # Check if it's a weekend (Saturday=5, Sunday=6)
         return True
     return False
-
-# Utility: Refresh the app
-def refresh_page():
-    st.experimental_set_query_params(refresh=str(int(time.time())))
 
 # Display an image below the title
 image_path = "images/background.jpg"  # Replace with the actual path to your image
@@ -69,7 +64,8 @@ with tabs[0]:
             date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
             date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
 
-            st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
+            # Drop the 'Date' column and reset index to remove the default index column
+            st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
 
         # Input for booking start and end times
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
@@ -104,7 +100,6 @@ with tabs[0]:
                     bookings = pd.concat([bookings, new_booking], ignore_index=True)
                     bookings.to_csv("bookings.csv", index=False)
                     st.success("Room booked successfully!")
-                    refresh_page()
 
 # Second tab: Edit or Cancel Booking
 with tabs[1]:
@@ -118,11 +113,13 @@ with tabs[1]:
     if date_bookings.empty:
         st.write("No bookings for the selected date.")
     else:
+        # Display existing bookings with readable times
         date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
         date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
 
         st.subheader("Existing Bookings")
-        st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
+        # Display existing bookings without the 'Date' column using st.dataframe() or st.table() after resetting the index
+        st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
 
         booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booked By'].tolist())
 
@@ -137,9 +134,9 @@ with tabs[1]:
             edit_or_cancel = st.radio("What would you like to do?", ("Edit Booking", "Cancel Booking"))
 
             if edit_or_cancel == "Edit Booking":
-                new_start_time = st.selectbox("New Start Time", time_options,
+                new_start_time = st.selectbox("New Start Time", time_options, index=time_options.index(datetime.strptime(selected_booking['Start Time'], '%I:%M %p').time()) if selected_booking['Start Time'] else 0,
                                               format_func=lambda x: convert_to_readable_time(x))
-                new_end_time = st.selectbox("New End Time", time_options,
+                new_end_time = st.selectbox("New End Time", time_options, index=time_options.index(datetime.strptime(selected_booking['End Time'], '%I:%M %p').time()) if selected_booking['End Time'] else 0,
                                             format_func=lambda x: convert_to_readable_time(x))
                 new_booked_by = st.text_input("New Booked By", value=selected_booking['Booked By'])
                 
@@ -155,7 +152,6 @@ with tabs[1]:
                         bookings.loc[bookings['Booked By'] == booking_to_edit, ['Start Time', 'End Time', 'Booked By']] = [start_datetime, end_datetime, new_booked_by]
                         bookings.to_csv("bookings.csv", index=False)
                         st.success("Booking updated successfully!")
-                        refresh_page()
                     else:
                         st.error(f"New time conflicts with another booking during the selected time.")
 
@@ -164,4 +160,3 @@ with tabs[1]:
                     bookings = bookings[bookings['Booked By'] != booking_to_edit]
                     bookings.to_csv("bookings.csv", index=False)
                     st.success(f"Booking for {booking_to_edit} has been canceled.")
-                    refresh_page()
