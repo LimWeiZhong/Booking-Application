@@ -16,7 +16,7 @@ except FileNotFoundError:
 # Load blocked dates
 try:
     blocked_dates_df = pd.read_csv("blocked_dates.csv")
-    blocked_dates = set(pd.to_datetime(blocked_dates_df['Blocked Dates']).dt.date)
+    blocked_dates = set(pd.to_datetime(blocked_dates_df['Blocked Date']).dt.date)
 except FileNotFoundError:
     blocked_dates = set()
 
