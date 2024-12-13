@@ -13,6 +13,13 @@ try:
 except FileNotFoundError:
     bookings = pd.DataFrame(columns=["Room", "Date", "Start Time", "End Time", "Booked By"])
 
+# Load blocked dates
+try:
+    blocked_dates_df = pd.read_csv("blocked_dates.csv")
+    blocked_dates = set(pd.to_datetime(blocked_dates_df['Blocked Dates']).dt.date)
+except FileNotFoundError:
+    blocked_dates = set()
+
 # Generate time options in 30-minute intervals between 8 AM and 6 PM
 def generate_time_options():
     base_time = datetime(2000, 1, 1, 8, 0)
@@ -28,6 +35,8 @@ def convert_to_readable_time(time_obj):
 def is_blocked_or_weekend(date):
     if date.weekday() >= 5:  # Check if it's a weekend (Saturday=5, Sunday=6)
         return True
+    if date.date() in blocked_dates:  # Check if it's a blocked date
+        return True
     return False
 
 # Display an image below the title
@@ -42,14 +51,15 @@ with tabs[0]:
     st.title("Meeting Room Booking System")
     st.subheader("Book a Room")
 
-    
-
     today = datetime.today()
     date = st.date_input("Select a Date", min_value=today)
 
     # Check if selected date is blocked or weekend
     if is_blocked_or_weekend(date):
-        st.error(f"The meeting room is closed on {date.strftime('%A, %B %d, %Y')}.")
+        if date.date() in blocked_dates:
+            st.error(f"The meeting room is unavailable on {date.strftime('%A, %B %d, %Y')} due to a blocked date.")
+        else:
+            st.error(f"The meeting room is closed on {date.strftime('%A, %B %d, %Y')} (weekend).")
     else:
         # Show existing bookings for the selected date
         date_bookings = bookings[bookings['Date'] == date.strftime('%Y-%m-%d')]
@@ -65,7 +75,7 @@ with tabs[0]:
             date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
 
             # Drop the 'Date' column and reset index to remove the default index column
-            st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
+            st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
 
         # Input for booking start and end times
         room = st.selectbox("Select a Room", meeting_rooms)
@@ -120,27 +130,29 @@ with tabs[1]:
 
         st.subheader("Existing Bookings")
         # Display existing bookings without the 'Date' column using st.dataframe() or st.table() after resetting the index
-        st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
+        st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
 
         booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booked By'].tolist())
 
         if booking_to_edit != "Select a booking":
             selected_booking = date_bookings[date_bookings['Booked By'] == booking_to_edit].iloc[0]
-            
+
             st.write(f"Selected booking details:")
             st.write(f"Room: {selected_booking['Room']}")
             st.write(f"Start Time: {selected_booking['Start Time']}")
             st.write(f"End Time: {selected_booking['End Time']}")
-            
+
             edit_or_cancel = st.radio("What would you like to do?", ("Edit Booking", "Cancel Booking"))
 
             if edit_or_cancel == "Edit Booking":
-                new_start_time = st.selectbox("New Start Time", time_options, index=time_options.index(datetime.strptime(selected_booking['Start Time'], '%I:%M %p').time()) if selected_booking['Start Time'] else 0,
+                new_start_time = st.selectbox("New Start Time", time_options, 
+                                              index=time_options.index(datetime.strptime(selected_booking['Start Time'], '%I:%M %p').time()) if selected_booking['Start Time'] else 0,
                                               format_func=lambda x: convert_to_readable_time(x))
-                new_end_time = st.selectbox("New End Time", time_options, index=time_options.index(datetime.strptime(selected_booking['End Time'], '%I:%M %p').time()) if selected_booking['End Time'] else 0,
+                new_end_time = st.selectbox("New End Time", time_options, 
+                                            index=time_options.index(datetime.strptime(selected_booking['End Time'], '%I:%M %p').time()) if selected_booking['End Time'] else 0,
                                             format_func=lambda x: convert_to_readable_time(x))
                 new_booked_by = st.text_input("New Booked By", value=selected_booking['Booked By'])
-                
+
                 if st.button("Save Changes"):
                     start_datetime = datetime.combine(date, new_start_time)
                     end_datetime = datetime.combine(date, new_end_time)
