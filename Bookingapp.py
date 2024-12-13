@@ -63,10 +63,11 @@ def log_transaction(action, room, date, start_time, end_time, user):
 
 # Streamlit Interface
 image_path = "images/background.jpg"
-st.image(image_path, use_column_width=True)
 st.set_page_config(
     initial_sidebar_state="collapsed"  # Collapse the sidebar
 )
+st.image(image_path, use_column_width=True)
+
 tabs = st.tabs(["Book a Room", "Edit or Cancel Booking"])
 
 # First Tab: Book a Room
