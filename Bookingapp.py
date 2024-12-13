@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # Define available meeting rooms
 meeting_rooms = ["Room A", "Room B", "Room C"]
 
-# Load bookings data (initialize with an empty DataFrame if no data exists)
+# Load bookings data
 try:
     bookings = pd.read_csv("bookings.csv")
     bookings['Start Time'] = pd.to_datetime(bookings['Start Time'])
@@ -20,6 +20,12 @@ try:
 except FileNotFoundError:
     blocked_dates = set()
 
+# Load transaction log
+try:
+    transaction_log = pd.read_csv("transaction_log.csv")
+except FileNotFoundError:
+    transaction_log = pd.DataFrame(columns=["Action", "Room", "Date", "Start Time", "End Time", "User", "Timestamp"])
+
 # Generate time options in 30-minute intervals between 8 AM and 6 PM
 def generate_time_options():
     base_time = datetime(2000, 1, 1, 8, 0)
@@ -27,7 +33,7 @@ def generate_time_options():
 
 time_options = generate_time_options()
 
-# Function to convert time to a more readable format (e.g., 09:00 AM)
+# Function to convert time to a readable format
 def convert_to_readable_time(time_obj):
     return time_obj.strftime('%I:%M %p')
 
@@ -39,45 +45,50 @@ def is_blocked_or_weekend(date):
         return True
     return False
 
-# Display an image below the title
-image_path = "images/background.jpg"  # Replace with the actual path to your image
+# Function to log transactions
+def log_transaction(action, room, date, start_time, end_time, user):
+    global transaction_log
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_log = pd.DataFrame({
+        "Action": [action],
+        "Room": [room],
+        "Date": [date],
+        "Start Time": [start_time],
+        "End Time": [end_time],
+        "User": [user],
+        "Timestamp": [timestamp]
+    })
+    transaction_log = pd.concat([transaction_log, new_log], ignore_index=True)
+    transaction_log.to_csv("transaction_log.csv", index=False)
+
+# Streamlit Interface
+image_path = "images/background.jpg"
 st.image(image_path, use_column_width=True)
 
-# Create tabs
-tabs = st.tabs(["Book a Room", "Edit or Cancel Booking"])
+tabs = st.tabs(["Book a Room", "Edit or Cancel Booking", "Admin"])
 
-# First tab: Book a Room
+# First Tab: Book a Room
 with tabs[0]:
     st.title("Meeting Room Booking System")
     st.subheader("Book a Room")
-
     today = datetime.today()
     date = st.date_input("Select a Date", min_value=today)
 
-    # Check if selected date is blocked or weekend
     if is_blocked_or_weekend(date):
         if date in blocked_dates:
             st.error(f"The meeting room is unavailable on {date.strftime('%A, %B %d, %Y')} due to a blocked date.")
         else:
             st.error(f"The meeting room is closed on {date.strftime('%A, %B %d, %Y')} (weekend).")
     else:
-        # Show existing bookings for the selected date
         date_bookings = bookings[bookings['Date'] == date.strftime('%Y-%m-%d')]
-
         if date_bookings.empty:
             st.write("No bookings for the selected date.")
         else:
-            # Add a header for existing bookings
             st.subheader("Existing Bookings")
-
-            # Display existing bookings with readable times
             date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
             date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
-
-            # Drop the 'Date' column and reset index to remove the default index column
             st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
 
-        # Input for booking start and end times
         room = st.selectbox("Select a Room", meeting_rooms)
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         end_time = st.selectbox("End Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
@@ -94,8 +105,8 @@ with tabs[0]:
                 start_datetime = datetime.combine(date, start_time)
                 end_datetime = datetime.combine(date, end_time)
 
-                conflict = bookings[(bookings['Room'] == room) & 
-                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
+                conflict = bookings[(bookings['Room'] == room) &
+                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) &
                                     ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime))]
 
                 if not conflict.empty:
@@ -110,38 +121,26 @@ with tabs[0]:
                     })
                     bookings = pd.concat([bookings, new_booking], ignore_index=True)
                     bookings.to_csv("bookings.csv", index=False)
+                    log_transaction("Booking", room, date.strftime('%Y-%m-%d'), start_datetime, end_datetime, booked_by)
                     st.success("Room booked successfully!")
 
-# Second tab: Edit or Cancel Booking
+# Second Tab: Edit or Cancel Booking
 with tabs[1]:
     st.title("Manage Your Bookings")
-    st.subheader(f"Existing Bookings")
-
     date = st.date_input("Select a Date for Editing or Cancelling", min_value=datetime.today())
-
     date_bookings = bookings[bookings['Date'] == date.strftime('%Y-%m-%d')]
 
     if date_bookings.empty:
         st.write("No bookings for the selected date.")
     else:
-        # Display existing bookings with readable times
         date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
         date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
-
-        st.subheader("Existing Bookings")
-        # Display existing bookings without the 'Date' column using st.dataframe() or st.table() after resetting the index
         st.dataframe(date_bookings.drop(columns=['Date']), hide_index=True)
 
         booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booked By'].tolist())
 
         if booking_to_edit != "Select a booking":
             selected_booking = date_bookings[date_bookings['Booked By'] == booking_to_edit].iloc[0]
-
-            st.write(f"Selected booking details:")
-            st.write(f"Room: {selected_booking['Room']}")
-            st.write(f"Start Time: {selected_booking['Start Time']}")
-            st.write(f"End Time: {selected_booking['End Time']}")
-
             edit_or_cancel = st.radio("What would you like to do?", ("Edit Booking", "Cancel Booking"))
 
             if edit_or_cancel == "Edit Booking":
@@ -156,14 +155,14 @@ with tabs[1]:
                 if st.button("Save Changes"):
                     start_datetime = datetime.combine(date, new_start_time)
                     end_datetime = datetime.combine(date, new_end_time)
-
-                    conflict = bookings[(bookings['Room'] == selected_booking['Room']) & 
-                                        (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
+                    conflict = bookings[(bookings['Room'] == selected_booking['Room']) &
+                                        (bookings['Date'] == date.strftime('%Y-%m-%d')) &
                                         ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime))]
 
                     if conflict.empty:
                         bookings.loc[bookings['Booked By'] == booking_to_edit, ['Start Time', 'End Time', 'Booked By']] = [start_datetime, end_datetime, new_booked_by]
                         bookings.to_csv("bookings.csv", index=False)
+                        log_transaction("Edit", selected_booking['Room'], date.strftime('%Y-%m-%d'), start_datetime, end_datetime, new_booked_by)
                         st.success("Booking updated successfully!")
                     else:
                         st.error(f"New time conflicts with another booking during the selected time.")
@@ -172,4 +171,14 @@ with tabs[1]:
                 if st.button("Cancel Booking"):
                     bookings = bookings[bookings['Booked By'] != booking_to_edit]
                     bookings.to_csv("bookings.csv", index=False)
+                    log_transaction("Cancellation", selected_booking['Room'], date.strftime('%Y-%m-%d'), selected_booking['Start Time'], selected_booking['End Time'], booking_to_edit)
                     st.success(f"Booking for {booking_to_edit} has been canceled.")
+
+# Third Tab: Admin
+with tabs[2]:
+    st.title("Admin Page")
+    st.subheader("Transaction History")
+    st.dataframe(transaction_log, hide_index=True)
+
+    csv = transaction_log.to_csv(index=False)
+    st.download_button(label="Download Transaction History", data=csv, file_name="transaction_log.csv", mime="text/csv")
