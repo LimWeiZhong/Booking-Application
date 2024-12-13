@@ -42,7 +42,7 @@ with tabs[0]:
     st.title("Meeting Room Booking System")
     st.subheader("Book a Room")
 
-    room = st.selectbox("Select a Room", meeting_rooms)
+    
 
     today = datetime.today()
     date = st.date_input("Select a Date", min_value=today)
@@ -68,6 +68,7 @@ with tabs[0]:
             st.dataframe(date_bookings.drop(columns=['Date']),hide_index=True)  # This will not display the index column
 
         # Input for booking start and end times
+        room = st.selectbox("Select a Room", meeting_rooms)
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         end_time = st.selectbox("End Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         booked_by = st.text_input("Your Name")
