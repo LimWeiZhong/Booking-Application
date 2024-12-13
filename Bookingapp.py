@@ -1,14 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import traceback
-
-# Email Configuration
-EMAIL_ADDRESS = "lim_wei_zhong@hotmail.com"  # Replace with your Gmail address
-EMAIL_PASSWORD = "d81c655b0deadtitan"   # Replace with your Gmail app password
 
 # Define available meeting rooms
 meeting_rooms = ["Room A", "Room B", "Room C"]
@@ -53,41 +46,8 @@ def is_blocked_or_weekend(date):
         return True
     return False
 
-def send_email_notification(action, room, date, start_time, end_time, user, recipient_email):
-    subject = "New Booking System Notification"
-    body = f"""
-    A new transaction has been made in the booking system:
-
-    Action: {action}
-    Room: {room}
-    Date: {date}
-    Start Time: {start_time}
-    End Time: {end_time}
-    User: {user}
-
-    Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    """
-
-    # Construct email
-    msg = MIMEMultipart()
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = recipient_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        # Connect to the Outlook/Hotmail SMTP server
-        with smtplib.SMTP('smtp-mail.outlook.com', 587) as server:
-            server.starttls()  # Secure the connection using TLS
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)  # Login with your Hotmail/Outlook email and app password
-            server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())  # Send the email
-        print(f"Email sent successfully to {recipient_email}")  # Debug message for success
-    except Exception as e:
-        print(f"Failed to send email notification: {e}")  # Debug message for failure
-        print(traceback.format_exc())  # Print detailed traceback for debugging
-
-# Function to log transactions
-def log_transaction(action, room, date, start_time, end_time, user, recipient_email):
+# Function to log transactions (without email notification)
+def log_transaction(action, room, date, start_time, end_time, user):
     global transaction_log
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     new_log = pd.DataFrame({
@@ -101,9 +61,6 @@ def log_transaction(action, room, date, start_time, end_time, user, recipient_em
     })
     transaction_log = pd.concat([transaction_log, new_log], ignore_index=True)
     transaction_log.to_csv("transaction_log.csv", index=False)
-
-    # Send email notification
-    send_email_notification(action, room, date, start_time, end_time, user, recipient_email)
 
 # Streamlit Interface
 image_path = "images/background.jpg"
@@ -140,7 +97,6 @@ with tabs[0]:
         start_time = st.selectbox("Start Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         end_time = st.selectbox("End Time", [None] + time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         booked_by = st.text_input("Your Name")
-        recipient_email = st.text_input("Recipient Email Address")
 
         if st.button("Book Room"):
             if not start_time or not end_time:
@@ -149,14 +105,12 @@ with tabs[0]:
                 st.error("End time must be after start time.")
             elif not booked_by.strip():
                 st.error("Please enter your name.")
-            elif not recipient_email.strip():
-                st.error("Please enter a valid recipient email address.")
             else:
                 start_datetime = datetime.combine(date, start_time)
                 end_datetime = datetime.combine(date, end_time)
 
-                conflict = bookings[(bookings['Room'] == room) &
-                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) &
+                conflict = bookings[(bookings['Room'] == room) & 
+                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
                                     ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime))]
 
                 if not conflict.empty:
@@ -171,7 +125,7 @@ with tabs[0]:
                     })
                     bookings = pd.concat([bookings, new_booking], ignore_index=True)
                     bookings.to_csv("bookings.csv", index=False)
-                    log_transaction("Booking", room, date.strftime('%Y-%m-%d'), start_datetime, end_datetime, booked_by, recipient_email)
+                    log_transaction("Booking", room, date.strftime('%Y-%m-%d'), start_datetime, end_datetime, booked_by)
                     st.success("Room booked successfully!")
 
 # Second Tab: Edit or Cancel Booking
@@ -201,27 +155,25 @@ with tabs[1]:
                                             index=time_options.index(datetime.strptime(selected_booking['End Time'], '%I:%M %p').time()) if selected_booking['End Time'] else 0,
                                             format_func=lambda x: convert_to_readable_time(x))
                 new_booked_by = st.text_input("New Booked By", value=selected_booking['Booked By'])
-                recipient_email = st.text_input("Recipient Email Address")
 
                 if st.button("Save Changes"):
                     start_datetime = datetime.combine(date, new_start_time)
                     end_datetime = datetime.combine(date, new_end_time)
-                    conflict = bookings[(bookings['Room'] == selected_booking['Room']) &
+                    conflict = bookings[(bookings['Room'] == selected_booking['Room']) & 
                                         (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
                                         ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime))]
 
                     if conflict.empty:
                         bookings.loc[bookings['Booked By'] == booking_to_edit, ['Start Time', 'End Time', 'Booked By']] = [start_datetime, end_datetime, new_booked_by]
                         bookings.to_csv("bookings.csv", index=False)
-                        log_transaction("Edit", selected_booking['Room'], date.strftime('%Y-%m-%d'), start_datetime, end_datetime, new_booked_by, recipient_email)
+                        log_transaction("Edit", selected_booking['Room'], date.strftime('%Y-%m-%d'), start_datetime, end_datetime, new_booked_by)
                         st.success("Booking updated successfully!")
                     else:
                         st.error(f"New time conflicts with another booking during the selected time.")
 
             elif edit_or_cancel == "Cancel Booking":
-                recipient_email = st.text_input("Recipient Email Address")
                 if st.button("Cancel Booking"):
                     bookings = bookings[bookings['Booked By'] != booking_to_edit]
                     bookings.to_csv("bookings.csv", index=False)
-                    log_transaction("Cancellation", selected_booking['Room'], date.strftime('%Y-%m-%d'), selected_booking['Start Time'], selected_booking['End Time'], booking_to_edit, recipient_email)
+                    log_transaction("Cancellation", selected_booking['Room'], date.strftime('%Y-%m-%d'), selected_booking['Start Time'], selected_booking['End Time'], booking_to_edit)
                     st.success(f"Booking for {booking_to_edit} has been canceled.")
