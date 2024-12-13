@@ -35,7 +35,7 @@ def convert_to_readable_time(time_obj):
 def is_blocked_or_weekend(date):
     if date.weekday() >= 5:  # Check if it's a weekend (Saturday=5, Sunday=6)
         return True
-    if date.date() in blocked_dates:  # Check if it's a blocked date
+    if date in blocked_dates:  # Check if it's a blocked date
         return True
     return False
 
