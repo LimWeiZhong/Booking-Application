@@ -1,1 +1,5 @@
 Action,Room,Date,Start Time,End Time,User,Timestamp,Meeting Title,Contact Number,Password
+Booking,DFO Conference Room (Max 15 Pax),2025-01-07,2025-01-07 08:00:00,2025-01-07 10:30:00,WZ,2025-01-07 23:07:13,q,q,q
+Edit,DFO Conference Room (Max 15 Pax),2025-01-07,2025-01-07 08:00:00,2025-01-07 11:00:00,WZ,2025-01-07 23:08:46,q,q,q
+Cancellation,DFO Conference Room (Max 15 Pax),2025-01-07,08:00 AM,11:00 AM,WZ,2025-01-07 23:08:59,q,q,q
+Booking,DFO Conference Room (Max 15 Pax),2025-01-15,2025-01-15 08:00:00,2025-01-15 10:30:00,Wei zhong,2025-01-07 23:25:02,testing,12345678,a

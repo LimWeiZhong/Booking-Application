@@ -7,6 +7,8 @@ import plotly.express as px
 # Function to load and preprocess transaction log
 def load_transaction_log():
     transaction_log = pd.read_csv('./transaction_log.csv')
+    # Filter the transaction log to include only 'Booking' actions
+    transaction_log = transaction_log[transaction_log['Action'] == 'Booking']
     transaction_log['Date'] = pd.to_datetime(transaction_log['Date'])
     transaction_log['Year'] = transaction_log['Date'].dt.year
     transaction_log['Month'] = transaction_log['Date'].dt.month
@@ -21,15 +23,16 @@ def load_blocked_dates():
     blocked_dates['Blocked Date'] = pd.to_datetime(blocked_dates['Blocked Date'], format='%d/%m/%Y')
     return blocked_dates
 
-# Reload transaction log and blocked dates each time the page is refreshed
-transaction_log = load_transaction_log()
-blocked_dates = load_blocked_dates()
 
 st.set_page_config(
     page_title="Booking Usage Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Reload transaction log and blocked dates each time the page is refreshed
+transaction_log = load_transaction_log()
+blocked_dates = load_blocked_dates()
 
 # Store the reloaded transaction log and blocked dates in session state
 if 'transaction_log' not in st.session_state:
