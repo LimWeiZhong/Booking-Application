@@ -28,7 +28,7 @@ try:
 except FileNotFoundError:
     transaction_log = pd.DataFrame(columns=["Action", "Room", "Date", "Start Time", "End Time", "User", "Meeting Title", "Contact Number", "Password", "Timestamp"])
 
-# Generate time options in 30-minute intervals between 8 AM and 6 PM                        
+# Generate time options in 30-minute intervals between 8 AM and 6 PM
 def generate_time_options():
     base_time = datetime(2000, 1, 1, 8, 0)
     return [(base_time + timedelta(minutes=30 * i)).time() for i in range(21)]
@@ -93,8 +93,8 @@ with tabs[0]:
             st.write("No bookings for the selected date.")
         else:
             st.subheader("Existing Bookings")
-            date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
-            date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
+            date_bookings['Start Time'] = date_bookings['Start Time'].dt.strftime('%I:%M %p')
+            date_bookings['End Time'] = date_bookings['End Time'].dt.strftime('%I:%M %p')
             date_bookings['Contact Number'] = date_bookings['Contact Number'].astype(str)  # Ensure contact numbers are displayed without commas
             st.dataframe(date_bookings.drop(columns=['Date', "Password"]), hide_index=True)
 
@@ -146,92 +146,109 @@ with tabs[0]:
                     st.success("Room booked successfully!")
 
 # Second Tab: Edit or Cancel Booking
+# Function to convert string time to datetime.time object
+def string_to_time(time_str):
+    return datetime.strptime(time_str, "%I:%M %p").time()
+
+# Second Tab: Edit or Cancel Booking
 with tabs[1]:
-    st.title("Manage Your Bookings")
-    date = st.date_input("Select a Date for Editing or Cancelling", min_value=datetime.today())
-    date_bookings = bookings[bookings['Date'] == date.strftime('%Y-%m-%d')]
+    st.title("Edit or Cancel Booking")
+    
+    # User input for searching existing bookings by password
+    password = st.text_input("Enter Meeting Password (Cap Sensitive)")
 
-    if date_bookings.empty:
-        st.write("No bookings for the selected date.")
-    else:
-        # Format Start Time and End Time for readability
-        date_bookings['Start Time'] = date_bookings['Start Time'].apply(lambda x: convert_to_readable_time(x))
-        date_bookings['End Time'] = date_bookings['End Time'].apply(lambda x: convert_to_readable_time(x))
-        
-        # Ensure Contact Number is displayed without commas
-        date_bookings['Contact Number'] = date_bookings['Contact Number'].astype(str)
+    if password:
+        # Search for existing bookings matching the password
+        matched_bookings = bookings[bookings['Password'] == password]
 
-        # Create a new column that combines Room, Start Time, and Meeting Title for easy identification
-        date_bookings['Booking Info'] = date_bookings.apply(
-            lambda row: f"{row['Booked By']} - {row['Start Time']} - {row['Room']}", axis=1)
+        if matched_bookings.empty:
+            st.error("No matching bookings found. Please check the meeting password.")
+        else:
+            # Display the matched booking details
+            st.subheader("Your Bookings")
+            matched_bookings['Start Time'] = matched_bookings['Start Time'].dt.strftime('%I:%M %p')
+            matched_bookings['End Time'] = matched_bookings['End Time'].dt.strftime('%I:%M %p')
+            st.dataframe(matched_bookings.drop(columns=["Password"]), hide_index=True)
 
-        st.dataframe(date_bookings.drop(columns=['Date', "Password","Booking Info"]), hide_index=True)
+            # If multiple bookings exist, allow the user to select one
+            booking_to_edit = st.selectbox("Select a Booking to Edit or Cancel", matched_bookings.index, format_func=lambda x: f"Room: {matched_bookings.loc[x, 'Room']} | Date: {matched_bookings.loc[x, 'Date']} | Start: {matched_bookings.loc[x, 'Start Time']} | End: {matched_bookings.loc[x, 'End Time']}")
 
-        # Allow user to select a specific booking based on combined info
-        booking_to_edit = st.selectbox("Select a booking to edit or cancel", ["Select a booking"] + date_bookings['Booking Info'].tolist())
+            if booking_to_edit is not None:
+                # Store the selected booking in session state
+                st.session_state.selected_booking = matched_bookings.loc[booking_to_edit]
 
-        if booking_to_edit != "Select a booking":
-            # Find the selected booking based on the unique Booking Info
-            selected_booking = date_bookings[date_bookings['Booking Info'] == booking_to_edit].iloc[0]
-            edit_or_cancel = st.radio("What would you like to do?", ("Edit Booking", "Cancel Booking"))
+                # Retrieve the selected booking from session state
+                selected_booking = st.session_state.selected_booking
 
-            # Input for Meeting Password to validate the user
-            meeting_password = st.text_input("Enter Meeting Password (Cap Sensitive)", type="password")
+                action = st.radio("Select Action", ["Edit Booking", "Cancel Booking"])
 
-            if edit_or_cancel == "Edit Booking":
-                if meeting_password == selected_booking['Password']:  # Check if the entered password matches the original one
-                    # Pre-fill existing values for editing
-                    new_start_time = st.selectbox("New Start Time", time_options, 
-                                                  index=time_options.index(datetime.strptime(selected_booking['Start Time'], '%I:%M %p').time()) if selected_booking['Start Time'] else 0,
-                                                  format_func=lambda x: convert_to_readable_time(x))
-                    new_end_time = st.selectbox("New End Time", time_options, 
-                                                index=time_options.index(datetime.strptime(selected_booking['End Time'], '%I:%M %p').time()) if selected_booking['End Time'] else 0,
-                                                format_func=lambda x: convert_to_readable_time(x))
-                    new_booked_by = st.text_input("New Booked By", value=selected_booking['Booked By'])
+                if action == "Edit Booking":
+                    # Convert the string date to a datetime.date object
+                    selected_date = datetime.strptime(selected_booking['Date'], '%Y-%m-%d').date()
+
+                    # Populate the form with the selected booking details
+                    new_room = st.selectbox("New Room", meeting_rooms, index=meeting_rooms.index(selected_booking['Room']))
+                    
+                    # Convert the string time to datetime.time objects for comparison
+                    new_start_time = st.selectbox("New Start Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "", 
+                                                  index=time_options.index(string_to_time(selected_booking['Start Time'])))
+                    new_end_time = st.selectbox("New End Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "", 
+                                                index=time_options.index(string_to_time(selected_booking['End Time'])))
+
                     new_meeting_title = st.text_input("New Meeting Title", value=selected_booking['Meeting Title'])
-                    new_contact_number = st.text_input("New Contact Number", value=str(selected_booking['Contact Number']))  # Ensure it shows without commas
-
+                    
                     if st.button("Save Changes"):
-                        start_datetime = datetime.combine(date, new_start_time)
-                        end_datetime = datetime.combine(date, new_end_time)
-
-                        conflict = bookings[(bookings['Room'] == selected_booking['Room']) &
-                                            (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
-                                            ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime)) & 
-                                            (bookings['Booked By'] != selected_booking['Booked By'])]
-
-                        if not conflict.empty:
-                            st.error(f"New time conflicts with another booking during the selected time.")
+                        if not new_start_time or not new_end_time:
+                            st.error("Please select both start and end times.")
+                        elif new_start_time >= new_end_time:
+                            st.error("End time must be after start time.")
+                        elif not new_meeting_title.strip():
+                            st.error("Please enter a new meeting title.")
                         else:
-                            # Update only the selected booking, not all bookings by the user
-                            bookings.loc[(bookings['Room'] == selected_booking['Room']) &
-                                         (bookings['Date'] == date.strftime('%Y-%m-%d')) &
-                                         (bookings['Start Time'] == selected_booking['Start Time']) &
-                                         (bookings['Booked By'] == selected_booking['Booked By']), 
-                                         ['Start Time', 'End Time', 'Booked By', 'Meeting Title', 'Contact Number']] = \
-                                [start_datetime, end_datetime, new_booked_by, new_meeting_title, new_contact_number]
-                            bookings.to_csv("bookings.csv", index=False)
+                            # Convert selected times back to datetime objects using the selected date
+                            new_start_datetime = datetime.combine(selected_date, new_start_time)
+                            new_end_datetime = datetime.combine(selected_date, new_end_time)
+                            
+                            # Check for any conflicts with existing bookings (ignoring the current booking being edited)
+                            conflict = bookings[(bookings['Room'] == new_room) & 
+                                                (bookings['Date'] == selected_booking['Date']) & 
+                                                ((bookings['Start Time'] < new_end_datetime) & (bookings['End Time'] > new_start_datetime))]
 
-                            # Log the transaction
-                            log_transaction("Edit", selected_booking['Room'], date.strftime('%Y-%m-%d'), start_datetime, end_datetime, new_booked_by, new_meeting_title, new_contact_number, selected_booking['Password'])
+                            # Exclude the current booking from conflict check
+                            conflict = conflict[conflict.index != booking_to_edit]
 
-                            st.success("Booking updated successfully!")
-                else:
-                    st.error("Invalid password. You cannot edit this booking.")
+                            if not conflict.empty:
+                                conflict_user = conflict['Booked By'].iloc[0]
+                                
+                                # If the conflicting booking is by a different user, show an error
+                                if conflict_user != selected_booking['Booked By']:
+                                    st.error(f"This room is already booked during the selected time by {conflict_user}. Please choose a different time.")
+                                else:
+                                    # If the conflict is by the same user, allow the edit
+                                    bookings.loc[booking_to_edit, ['Room', 'Start Time', 'End Time', 'Meeting Title']] = [new_room, new_start_datetime, new_end_datetime, new_meeting_title]
+                                    bookings.to_csv("bookings.csv", index=False)
 
-            elif edit_or_cancel == "Cancel Booking":
-                if meeting_password == selected_booking['Password']:  # Check if the entered password matches the original one
-                    if st.button("Cancel Booking"):
-                        # Remove only the selected booking, not all bookings by the user
-                        bookings = bookings[~((bookings['Room'] == selected_booking['Room']) &
-                                            (bookings['Date'] == date.strftime('%Y-%m-%d')) &
-                                            (bookings['Start Time'] == selected_booking['Start Time']) &
-                                            (bookings['Booked By'] == selected_booking['Booked By']))]
+                                    # Log the transaction
+                                    log_transaction("Edit", new_room, selected_booking['Date'], new_start_datetime, new_end_datetime, selected_booking['Booked By'], new_meeting_title, selected_booking['Contact Number'], password)
+                                    
+                                    st.success("Booking updated successfully!")
+                            else:
+                                # No conflict, proceed with the edit
+                                bookings.loc[booking_to_edit, ['Room', 'Start Time', 'End Time', 'Meeting Title']] = [new_room, new_start_datetime, new_end_datetime, new_meeting_title]
+                                bookings.to_csv("bookings.csv", index=False)
+
+                                # Log the transaction
+                                log_transaction("Edit", new_room, selected_booking['Date'], new_start_datetime, new_end_datetime, selected_booking['Booked By'], new_meeting_title, selected_booking['Contact Number'], password)
+                                
+                                st.success("Booking updated successfully!")
+                
+                elif action == "Cancel Booking":
+                    if st.button("Confirm Cancellation"):
+                        # Remove the booking from the dataframe
+                        bookings = bookings.drop(booking_to_edit)
                         bookings.to_csv("bookings.csv", index=False)
 
-                        # Log the cancellation
-                        log_transaction("Cancellation", selected_booking['Room'], date.strftime('%Y-%m-%d'), selected_booking['Start Time'], selected_booking['End Time'], selected_booking['Booked By'], selected_booking['Meeting Title'], selected_booking['Contact Number'], selected_booking['Password'])
-
-                        st.success(f"Booking for {selected_booking['Booked By']} has been canceled.")
-                else:
-                    st.error("Invalid password. You cannot cancel this booking.")
+                        # Log the cancellation transaction
+                        log_transaction("Cancellation", selected_booking['Room'], selected_booking['Date'], selected_booking['Start Time'], selected_booking['End Time'], selected_booking['Booked By'], selected_booking['Meeting Title'], selected_booking['Contact Number'], password)
+                        
+                        st.success("Booking cancelled successfully!")
