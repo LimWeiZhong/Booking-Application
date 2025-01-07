@@ -102,7 +102,7 @@ with tabs[0]:
         start_time = st.selectbox("Start Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         end_time = st.selectbox("End Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "")
         booked_by = st.text_input("Your Name")
-        meeting_title = st.text_input("Meeting Title")
+        meeting_title = st.text_input("Meeting Title (Do not use words related to the organisation)")
         contact_number = st.text_input("Contact Number")
         password = st.text_input("Meeting Password (Cap Sensitive - Required when you want to edit/cancel your booking)")
 
@@ -163,7 +163,7 @@ with tabs[1]:
 
         # Create a new column that combines Room, Start Time, and Meeting Title for easy identification
         date_bookings['Booking Info'] = date_bookings.apply(
-            lambda row: f"{row['Room']} - {row['Start Time']} - {row['Meeting Title']} - {row['Booked By']}", axis=1)
+            lambda row: f"{row['Booked By']} - {row['Start Time']} - {row['Room']}", axis=1)
 
         st.dataframe(date_bookings.drop(columns=['Date', "Password","Booking Info"]), hide_index=True)
 
