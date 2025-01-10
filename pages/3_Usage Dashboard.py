@@ -4,18 +4,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
 
-# Function to load and preprocess transaction log
-def load_transaction_log():
-    transaction_log = pd.read_csv('./transaction_log.csv')
-    # Filter the transaction log to include only 'Booking' actions
-    transaction_log = transaction_log[transaction_log['Action'] == 'Booking']
-    transaction_log['Date'] = pd.to_datetime(transaction_log['Date'])
-    transaction_log['Year'] = transaction_log['Date'].dt.year
-    transaction_log['Month'] = transaction_log['Date'].dt.month
-    transaction_log['Day'] = transaction_log['Date'].dt.day
-    transaction_log['Start Time'] = pd.to_datetime(transaction_log['Start Time'])
-    transaction_log['End Time'] = pd.to_datetime(transaction_log['End Time'])
-    return transaction_log
+# Function to load and preprocess bookings data
+def load_bookings():
+    bookings = pd.read_csv('./bookings.csv')
+    bookings['Date'] = pd.to_datetime(bookings['Date'])
+    bookings['Start Time'] = pd.to_datetime(bookings['Start Time'])
+    bookings['End Time'] = pd.to_datetime(bookings['End Time'])
+    bookings['Year'] = bookings['Date'].dt.year
+    bookings['Month'] = bookings['Date'].dt.month
+    bookings['Day'] = bookings['Date'].dt.day
+    return bookings
+
 
 # Function to load and preprocess blocked dates
 def load_blocked_dates():
@@ -23,20 +22,19 @@ def load_blocked_dates():
     blocked_dates['Blocked Date'] = pd.to_datetime(blocked_dates['Blocked Date'], format='%d/%m/%Y')
     return blocked_dates
 
-
 st.set_page_config(
     page_title="Booking Usage Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Reload transaction log and blocked dates each time the page is refreshed
-transaction_log = load_transaction_log()
+# Load data
+bookings = load_bookings()
 blocked_dates = load_blocked_dates()
 
-# Store the reloaded transaction log and blocked dates in session state
-if 'transaction_log' not in st.session_state:
-    st.session_state.transaction_log = transaction_log
+# Store bookings and blocked dates in session state
+if 'bookings' not in st.session_state:
+    st.session_state.bookings = bookings
 if 'blocked_dates' not in st.session_state:
     st.session_state.blocked_dates = blocked_dates
 
@@ -45,13 +43,13 @@ with st.sidebar:
     st.header("Filter options")
     
     # Year selection with 'All Years' option
-    selected_year = st.selectbox("Select Year", options=['All Years'] + [str(year) for year in sorted(st.session_state.transaction_log['Year'].unique(), reverse=True)])
+    selected_year = st.selectbox("Select Year", options=['All Years'] + [str(year) for year in sorted(st.session_state.bookings['Year'].unique(), reverse=True)])
     
     # Filter data for selected year (if not 'All Years' selected)
     if selected_year != 'All Years':
-        filtered_by_year = st.session_state.transaction_log[st.session_state.transaction_log['Year'] == int(selected_year)]
+        filtered_by_year = st.session_state.bookings[st.session_state.bookings['Year'] == int(selected_year)]
     else:
-        filtered_by_year = st.session_state.transaction_log  # Use all data if 'All Years' is selected
+        filtered_by_year = st.session_state.bookings  # Use all data if 'All Years' is selected
 
     # Room selection with an option for 'All Rooms'
     selected_room = st.selectbox("Select Room", options=['All Rooms'] + sorted(filtered_by_year['Room'].unique().tolist()))
@@ -69,22 +67,21 @@ with st.sidebar:
     # Day of the month filter (1, 2, 3, etc.)
     day_of_month = st.multiselect("Select Day(s) of the Month", options=list(range(1, 32)))
 
-# Filter the transaction log for the selected room, year, month, and day
+# Filter the bookings data for the selected room, year, month, and day
 if selected_room == 'All Rooms':
-    filtered_transactions = filtered_by_year[filtered_by_year['Action'] == 'Booking']  # Only include bookings
+    filtered_bookings = filtered_by_year
 else:
-    filtered_transactions = filtered_by_year[(filtered_by_year['Room'] == selected_room) & 
-                                              (filtered_by_year['Action'] == 'Booking')]  # Only include bookings
+    filtered_bookings = filtered_by_year[filtered_by_year['Room'] == selected_room]
 
 if selected_month:
-    filtered_transactions = filtered_transactions[filtered_transactions['Month'] == selected_month]
+    filtered_bookings = filtered_bookings[filtered_bookings['Month'] == selected_month]
 
 if day_of_month:
-    filtered_transactions = filtered_transactions[filtered_transactions['Day'].isin(day_of_month)]
+    filtered_bookings = filtered_bookings[filtered_bookings['Day'].isin(day_of_month)]
 
-# Check if there are no transactions after filtering
-if filtered_transactions.empty:
-    st.warning("No transactions found for the selected filters.")
+# Check if there are no bookings after filtering
+if filtered_bookings.empty:
+    st.warning("No bookings found for the selected filters.")
 else:
     # Define available time slots (8 AM to 6 PM, 30-minute intervals)
     def available_time_slots(year, month, day_of_month=None):
@@ -115,12 +112,11 @@ else:
     def booked_time_slots(bookings):
         total_booked_slots = 0
         for _, row in bookings.iterrows():
-            if row['Action'] == 'Booking':  # Only count bookings
-                start_time = row['Start Time']
-                end_time = row['End Time']
-                # Calculate the difference in minutes and divide by 30 for slots
-                booked_slots = (end_time - start_time).total_seconds() / 1800  # 1800 seconds = 30 minutes
-                total_booked_slots += booked_slots
+            start_time = row['Start Time']
+            end_time = row['End Time']
+            # Calculate the difference in minutes and divide by 30 for slots
+            booked_slots = (end_time - start_time).total_seconds() / 1800  # 1800 seconds = 30 minutes
+            total_booked_slots += booked_slots
         return total_booked_slots
 
     # Get available time slots based on filtered data
@@ -129,11 +125,15 @@ else:
     else:
         available_slots = 0
 
-    # Get booked time slots from the filtered transactions
-    booked_slots = booked_time_slots(filtered_transactions)
+    # Get booked time slots from the filtered bookings
+    booked_slots = booked_time_slots(filtered_bookings)
 
-    # Calculate the utilization rate (booked slots / available slots)
-    utilization_rate = (booked_slots / available_slots) * 100 if available_slots > 0 else 0
+    # Adjust available slots if "All Rooms" is selected
+    adjustment_factor = 2 if selected_room == 'All Rooms' else 1
+    adjusted_available_slots = available_slots * adjustment_factor
+
+    # Calculate the utilization rate (booked slots / adjusted available slots)
+    utilization_rate = (booked_slots / adjusted_available_slots) * 100 if adjusted_available_slots > 0 else 0
 
     # Display key metrics
     with st.container():
@@ -153,16 +153,16 @@ else:
         )
         met2.metric(
             label="Total Bookings",
-            value=filtered_transactions.shape[0],
+            value=filtered_bookings.shape[0],
             help="Total number of bookings for the selected period"
         )
         met3.metric(
             label="Unique Users",
-            value=filtered_transactions['User'].nunique(),
+            value=filtered_bookings['Booked By'].nunique(),
             help="Number of unique users who made bookings"
         )
 
-    # Tabs for each metric
+    # Tabs for metrics
     tab_utilization_rate, tab_total_bookings, tab_unique_users = st.tabs(["Utilization Rate", "Total Bookings", "Unique Users"])
 
     # Utilization Rate Tab
@@ -172,54 +172,48 @@ else:
 
         with subtab_monthly:
             st.subheader("Monthly Utilization Rate")
-            # Create a complete list of months
             all_months = pd.MultiIndex.from_product(
-                [filtered_transactions['Year'].unique(), range(1, 13)], names=['Year', 'Month']
+                [filtered_bookings['Year'].unique(), range(1, 13)], names=['Year', 'Month']
             ).to_frame(index=False)
 
-            # Group data and merge with all months
             monthly_utilization = (
-                filtered_transactions.groupby(['Year', 'Month'])
-                .apply(lambda df: booked_time_slots(df) / available_time_slots(df['Year'].iloc[0], df['Month'].iloc[0]) * 100)
+                filtered_bookings.groupby(['Year', 'Month'])
+                .apply(lambda df: (
+                    (booked_time_slots(df) / (available_time_slots(df['Year'].iloc[0], df['Month'].iloc[0]) * adjustment_factor)) * 100
+                ))
                 .reset_index(name="Utilization Rate")
             )
             monthly_utilization = all_months.merge(monthly_utilization, on=['Year', 'Month'], how='left').fillna(0)
-
-            # Add month labels (Jan, Feb, etc.)
             monthly_utilization['Month Name'] = monthly_utilization['Month'].apply(lambda x: datetime(1900, x, 1).strftime('%b'))
 
-            # Plot
             fig = px.bar(
                 monthly_utilization,
                 x="Month Name", y="Utilization Rate",
                 title="Monthly Utilization Rate", labels={'Utilization Rate': 'Utilization Rate (%)'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
 
         with subtab_daily:
             st.subheader("Daily Utilization Rate")
-            # Create a complete list of dates
             all_dates = pd.date_range(
-                start=filtered_transactions['Date'].min(), end=filtered_transactions['Date'].max(), freq='D'
+                start=filtered_bookings['Date'].min(), end=filtered_bookings['Date'].max(), freq='D'
             )
             all_dates_df = pd.DataFrame(all_dates, columns=['Date'])
 
-            # Group data and merge with all dates
             daily_utilization = (
-                filtered_transactions.groupby(filtered_transactions['Date'])
-                .apply(lambda df: booked_time_slots(df) / available_time_slots(df['Year'].iloc[0], df['Month'].iloc[0], [df['Day'].iloc[0]]) * 100)
+                filtered_bookings.groupby(filtered_bookings['Date'])
+                .apply(lambda df: (
+                    (booked_time_slots(df) / (available_time_slots(df['Year'].iloc[0], df['Month'].iloc[0], [df['Day'].iloc[0]]) * adjustment_factor)) * 100
+                ))
                 .reset_index(name="Utilization Rate")
             )
             daily_utilization = all_dates_df.merge(daily_utilization, on='Date', how='left').fillna(0)
 
-            # Plot
             fig = px.line(
                 daily_utilization,
                 x="Date", y="Utilization Rate",
                 title="Daily Utilization Rate", labels={'Utilization Rate': 'Utilization Rate (%)'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
 
     # Total Bookings Tab
@@ -229,35 +223,27 @@ else:
 
         with subtab_monthly:
             st.subheader("Monthly Total Bookings")
-            # Create a complete list of months
-            monthly_bookings = filtered_transactions.groupby(['Year', 'Month'])['Action'].count().reset_index(name="Total Bookings")
+            monthly_bookings = filtered_bookings.groupby(['Year', 'Month'])['Room'].count().reset_index(name="Total Bookings")
             monthly_bookings = all_months.merge(monthly_bookings, on=['Year', 'Month'], how='left').fillna(0)
-
-            # Add month labels (Jan, Feb, etc.)
             monthly_bookings['Month Name'] = monthly_bookings['Month'].apply(lambda x: datetime(1900, x, 1).strftime('%b'))
 
-            # Plot
             fig = px.bar(
                 monthly_bookings,
                 x="Month Name", y="Total Bookings",
                 title="Monthly Total Bookings", labels={'Total Bookings': 'Total Bookings'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
 
         with subtab_daily:
             st.subheader("Daily Total Bookings")
-            # Create a complete list of dates
-            daily_bookings = filtered_transactions.groupby('Date')['Action'].count().reset_index(name="Total Bookings")
+            daily_bookings = filtered_bookings.groupby('Date')['Room'].count().reset_index(name="Total Bookings")
             daily_bookings = all_dates_df.merge(daily_bookings, on='Date', how='left').fillna(0)
 
-            # Plot as a line chart
             fig = px.line(
                 daily_bookings,
                 x="Date", y="Total Bookings",
                 title="Daily Total Bookings", labels={'Total Bookings': 'Total Bookings'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
 
     # Unique Users Tab
@@ -267,33 +253,26 @@ else:
 
         with subtab_monthly:
             st.subheader("Monthly Unique Users")
-            # Create a complete list of months
-            monthly_users = filtered_transactions.groupby(['Year', 'Month'])['User'].nunique().reset_index(name="Unique Users")
+            monthly_users = filtered_bookings.groupby(['Year', 'Month'])['Booked By'].nunique().reset_index(name="Unique Users")
             monthly_users = all_months.merge(monthly_users, on=['Year', 'Month'], how='left').fillna(0)
-
-            # Add month labels (Jan, Feb, etc.)
             monthly_users['Month Name'] = monthly_users['Month'].apply(lambda x: datetime(1900, x, 1).strftime('%b'))
 
-            # Plot
             fig = px.bar(
                 monthly_users,
                 x="Month Name", y="Unique Users",
                 title="Monthly Unique Users", labels={'Unique Users': 'Unique Users'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
 
         with subtab_daily:
             st.subheader("Daily Unique Users")
-            # Create a complete list of dates
-            daily_users = filtered_transactions.groupby('Date')['User'].nunique().reset_index(name="Unique Users")
+            daily_users = filtered_bookings.groupby('Date')['Booked By'].nunique().reset_index(name="Unique Users")
             daily_users = all_dates_df.merge(daily_users, on='Date', how='left').fillna(0)
 
-            # Plot
             fig = px.line(
                 daily_users,
                 x="Date", y="Unique Users",
                 title="Daily Unique Users", labels={'Unique Users': 'Unique Users'}
             )
-            fig.update_layout(showlegend=False)  # Remove legend
             st.plotly_chart(fig, use_container_width=True)
+

@@ -112,3 +112,4 @@ urllib3==2.2.3
 watchdog==4.0.2
 wcwidth==0.2.13
 yarl==1.11.1
+streamlit_calendar==1.2.1

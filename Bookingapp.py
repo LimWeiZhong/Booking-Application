@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+from streamlit_calendar import calendar
 
 # Define available meeting rooms
 meeting_rooms = ["DFO Conference Room (Max 15 Pax)", "I-Room (Max 5 Pax)"]
@@ -66,6 +67,10 @@ def log_transaction(action, room, date, start_time, end_time, user, meeting_titl
     transaction_log = pd.concat([transaction_log, new_log], ignore_index=True)
     transaction_log.to_csv("transaction_log.csv", index=False)
 
+# Function to convert string time to datetime.time object
+def string_to_time(time_str):
+    return datetime.strptime(time_str, "%I:%M %p").time()
+
 # Streamlit Interface
 image_path = "images/background.jpg"
 st.set_page_config(
@@ -73,14 +78,199 @@ st.set_page_config(
 )
 st.image(image_path, use_column_width=True)
 
-tabs = st.tabs(["Book a Room", "Edit or Cancel Booking"])
+# Create events for the calendar view with room-specific colors
+def create_calendar_events(bookings, room_colors):
+    calendar_events = []
+    for index, booking in bookings.iterrows():
+        # Handle missing values with defaults
+        title = booking.get('Meeting Title', 'Untitled Meeting')
+        booked_by = booking.get('Booked By', 'Unknown')
+        room = booking.get('Room', 'Unspecified Room')
+        start_time = booking.get('Start Time')
+        end_time = booking.get('End Time')
+
+        # Ensure start_time and end_time are properly formatted
+        if start_time and end_time:
+            # Format start time (for visual clarity if needed, this can be omitted)
+            formatted_start_time = start_time.strftime('%I:%M %p').lstrip("0")
+            formatted_start_time = formatted_start_time.replace('AM', 'am').replace('PM', 'pm')
+
+            # Format the end time only (this is what will appear in the title and description)
+            formatted_end_time = end_time.strftime('%I:%M%p').lstrip("0")
+            formatted_end_time = formatted_end_time.replace('AM', 'am').replace('PM', 'pm')  
+
+            # Update the event title to only show the end time
+            event_title = f"m-{formatted_end_time}"
+
+            # Update the event description to show only the end time
+            event_description = f"Room: {room}\nEnd: {formatted_end_time}\nBooked by: {booked_by}"
+
+            event = {
+                "title": event_title,
+                "start": start_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                "end": end_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                "resourceId": room,
+                "backgroundColor": "#FFFFFF",  # White background for events
+                "borderColor": room_colors.get(room, "#3788d8"),  # Border color based on room
+                "description": event_description,
+            }
+            calendar_events.append(event)
+    return calendar_events
+
+
+# Tabs setup
+tabs = st.tabs(["Calendar Overview", "Book a Room", "Edit or Cancel Booking"])
+
+# First Tab: Calendar Overview
+with tabs[0]:
+    st.title("DFO Meeting Room Overview")
+    st.subheader("View meeting room bookings at a glance")
+
+    # Dropdown for selecting a room filter
+    selected_room = st.radio(
+        "Filter by Room",
+        options=["All Rooms"] + meeting_rooms,
+        index=0
+    )
+
+    # Define room-specific colors (for border)
+    room_colors = {
+        "DFO Conference Room (Max 15 Pax)": "#4CAF50",  # Green
+        "I-Room (Max 5 Pax)": "#2196F3",  # Blue
+    }
+
+    # Create the events based on the bookings
+    calendar_events = create_calendar_events(bookings, room_colors)
+
+    # Filter events based on the selected room
+    if selected_room != "All Rooms":
+        filtered_events = [
+            event for event in calendar_events if event["resourceId"] == selected_room
+        ]
+    else:
+        filtered_events = calendar_events  # Show all events if "All Rooms" is selected
+
+    # Default calendar options with Day Grid view
+    calendar_options = {
+        "initialView": "dayGridMonth",  # Default to Day Grid Month view
+        "headerToolbar": {
+            "left": "prev,next today",  # Simplified navigation controls
+            "center": "title",
+            "right": ""  # Remove additional view options
+        },
+        "editable": False,  # Prevent users from editing events directly
+        "selectable": False,  # Disable event selection
+        "eventColor": "#FFFFFF",  # White event background
+        "slotMinTime": "06:00:00",
+        "slotMaxTime": "18:00:00",
+    }
+
+
+    # Custom CSS for improved calendar styling
+    custom_css = """
+        /* Remove the event dot */
+        .fc-event-dot {
+            display: none !important;  /* Forcefully hide the dot with !important */
+        }
+
+        .fc-event {
+            font-size: 9px; /* Smaller font size for event title */
+            font-weight: bold; /* Remove bold from event title */
+            padding: 0px;    /* Remove padding around text */
+            margin: 0px;     /* Remove margin around the event */
+            border-radius: 5px;
+            position: relative;
+            word-wrap: break-word;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: normal; /* Allow text to wrap */
+            border-width: 2px !important; /* Make sure the border is visible */
+            border-style: groove !important; /* Border style for each event */
+        }
+
+        .fc-toolbar-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Hover effect for better user experience */
+        .fc-event:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Added for improved readability of event descriptions */
+        .fc-event-description {
+            font-size: 9px;
+            line-height: 1.1;
+            white-space: normal; /* Ensure description wraps if necessary */
+            padding: 0px 0px;
+        }
+    """
+
+    # Display the calendar with filtered events
+    calendar_widget = calendar(events=filtered_events, options=calendar_options, custom_css=custom_css)
+    st.write(calendar_widget)
+
+# Add custom CSS to hide specific parts of the JSON output
+st.markdown("""
+    <style>
+    /* Hide the collapsed icon (arrow) */
+    .stJson .collapsed-icon {
+        display: none !important;
+    }
+    
+    /* Hide the opening '{' */
+    .stJson .object-key-val span:nth-child(2) {
+        display: none !important;
+    }
+
+    /* Hide the ellipsis '...' */
+    .stJson .node-ellipsis {
+        display: none !important;
+    }
+
+    /* Hide the closing '}' */
+    .stJson .brace-row span {
+        display: none !important;
+    }
+    
+    /* Hide the opening '{' for object contents */
+    .stJson .object-key-val > span:first-child {
+        display: none !important;
+    }
+
+    /* Hide the entire variable-row element */
+    .variable-row {
+        display: none !important;
+    }
+    
+    /* Hide the string-value span */
+    .string-value {
+        display: none !important;
+    }
+
+    /* Hide the copy-to-clipboard container */
+    .copy-to-clipboard-container {
+        display: none !important;
+    }
+
+    /* Hide the object-key-val element */
+    .object-key-val {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
+
 
 # First Tab: Book a Room
-with tabs[0]:
+with tabs[1]:
     st.title("Meeting Room Booking System")
     st.subheader("Book a Room")
     today = datetime.today()
-    date = st.date_input("Select a Date", min_value=today)
+    date = st.date_input("Select a Date", min_value=today,format="DD/MM/YYYY")
 
     if is_blocked_or_weekend(date):
         if date in blocked_dates:
@@ -123,8 +313,8 @@ with tabs[0]:
                 start_datetime = datetime.combine(date, start_time)
                 end_datetime = datetime.combine(date, end_time)
 
-                conflict = bookings[(bookings['Room'] == room) &
-                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) &
+                conflict = bookings[(bookings['Room'] == room) & 
+                                    (bookings['Date'] == date.strftime('%Y-%m-%d')) & 
                                     ((bookings['Start Time'] < end_datetime) & (bookings['End Time'] > start_datetime))]
 
                 if not conflict.empty:
@@ -145,13 +335,8 @@ with tabs[0]:
                     log_transaction("Booking", room, date.strftime('%Y-%m-%d'), start_datetime, end_datetime, booked_by, meeting_title, contact_number, password)
                     st.success("Room booked successfully!")
 
-# Second Tab: Edit or Cancel Booking
-# Function to convert string time to datetime.time object
-def string_to_time(time_str):
-    return datetime.strptime(time_str, "%I:%M %p").time()
 
-# Second Tab: Edit or Cancel Booking
-with tabs[1]:
+with tabs[2]:
     st.title("Edit or Cancel Booking")
     
     # User input for searching existing bookings by password
@@ -162,7 +347,7 @@ with tabs[1]:
         matched_bookings = bookings[bookings['Password'] == password]
 
         if matched_bookings.empty:
-            st.error("No matching bookings found. Please check the meeting password.")
+            st.error("No matching bookings found. Please check the meeting password. If you forget your password, please contact Wei Zhong @ 90890631")
         else:
             # Display the matched booking details
             st.subheader("Your Bookings")
@@ -186,61 +371,107 @@ with tabs[1]:
                     # Convert the string date to a datetime.date object
                     selected_date = datetime.strptime(selected_booking['Date'], '%Y-%m-%d').date()
 
-                    # Populate the form with the selected booking details
-                    new_room = st.selectbox("New Room", meeting_rooms, index=meeting_rooms.index(selected_booking['Room']))
-                    
-                    # Convert the string time to datetime.time objects for comparison
-                    new_start_time = st.selectbox("New Start Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "", 
-                                                  index=time_options.index(string_to_time(selected_booking['Start Time'])))
-                    new_end_time = st.selectbox("New End Time", time_options, format_func=lambda x: convert_to_readable_time(x) if x else "", 
-                                                index=time_options.index(string_to_time(selected_booking['End Time'])))
+                    # Allow user to select a new date
+                    new_date = st.date_input(
+                        "Select a New Date", 
+                        min_value=datetime.today(), 
+                        value=selected_date, 
+                        format="DD/MM/YYYY"
+                    )
 
-                    new_meeting_title = st.text_input("New Meeting Title", value=selected_booking['Meeting Title'])
-                    
-                    if st.button("Save Changes"):
-                        if not new_start_time or not new_end_time:
-                            st.error("Please select both start and end times.")
-                        elif new_start_time >= new_end_time:
-                            st.error("End time must be after start time.")
-                        elif not new_meeting_title.strip():
-                            st.error("Please enter a new meeting title.")
+                    if is_blocked_or_weekend(new_date):
+                        if new_date in blocked_dates:
+                            st.error(f"The meeting room is unavailable on {new_date.strftime('%A, %B %d, %Y')} due to a blocked date.")
                         else:
-                            # Convert selected times back to datetime objects using the selected date
-                            new_start_datetime = datetime.combine(selected_date, new_start_time)
-                            new_end_datetime = datetime.combine(selected_date, new_end_time)
-                            
-                            # Check for any conflicts with existing bookings (ignoring the current booking being edited)
-                            conflict = bookings[(bookings['Room'] == new_room) & 
-                                                (bookings['Date'] == selected_booking['Date']) & 
-                                                ((bookings['Start Time'] < new_end_datetime) & (bookings['End Time'] > new_start_datetime))]
+                            st.error(f"The meeting room is closed on {new_date.strftime('%A, %B %d, %Y')} (weekend).")
+                    else:
+                        # Populate the form with the selected booking details
+                        new_room = st.selectbox("New Room", meeting_rooms, index=meeting_rooms.index(selected_booking['Room']))
 
-                            # Exclude the current booking from conflict check
-                            conflict = conflict[conflict.index != booking_to_edit]
+                        # Convert the string time to datetime.time objects for comparison
+                        new_start_time = st.selectbox(
+                            "New Start Time", 
+                            time_options, 
+                            format_func=lambda x: convert_to_readable_time(x) if x else "",
+                            index=time_options.index(string_to_time(selected_booking['Start Time']))
+                        )
+                        new_end_time = st.selectbox(
+                            "New End Time", 
+                            time_options, 
+                            format_func=lambda x: convert_to_readable_time(x) if x else "",
+                            index=time_options.index(string_to_time(selected_booking['End Time']))
+                        )
 
-                            if not conflict.empty:
-                                conflict_user = conflict['Booked By'].iloc[0]
-                                
-                                # If the conflicting booking is by a different user, show an error
-                                if conflict_user != selected_booking['Booked By']:
-                                    st.error(f"This room is already booked during the selected time by {conflict_user}. Please choose a different time.")
+                        new_meeting_title = st.text_input("New Meeting Title", value=selected_booking['Meeting Title'])
+
+                        if st.button("Save Changes"):
+                            if not new_start_time or not new_end_time:
+                                st.error("Please select both start and end times.")
+                            elif new_start_time >= new_end_time:
+                                st.error("End time must be after start time.")
+                            elif not new_meeting_title.strip():
+                                st.error("Please enter a new meeting title.")
+                            else:
+                                # Convert selected times back to datetime objects using the selected date
+                                new_start_datetime = datetime.combine(new_date, new_start_time)
+                                new_end_datetime = datetime.combine(new_date, new_end_time)
+
+                                # Check for any conflicts with existing bookings (ignoring the current booking being edited)
+                                conflict = bookings[
+                                    (bookings['Room'] == new_room) & 
+                                    (bookings['Date'] == new_date.strftime('%Y-%m-%d')) & 
+                                    ((bookings['Start Time'] < new_end_datetime) & (bookings['End Time'] > new_start_datetime))
+                                ]
+
+                                # Exclude the current booking from conflict check
+                                conflict = conflict[conflict.index != booking_to_edit]
+
+                                if not conflict.empty:
+                                    conflict_user = conflict['Booked By'].iloc[0]
+                                    
+                                    # If the conflicting booking is by a different user, show an error
+                                    if conflict_user != selected_booking['Booked By']:
+                                        st.error(f"This room is already booked during the selected time by {conflict_user}. Please choose a different time.")
+                                    else:
+                                        # If the conflict is by the same user, allow the edit
+                                        bookings.loc[booking_to_edit, ['Date', 'Room', 'Start Time', 'End Time', 'Meeting Title']] = [
+                                            new_date.strftime('%Y-%m-%d'), 
+                                            new_room, 
+                                            new_start_datetime, 
+                                            new_end_datetime, 
+                                            new_meeting_title
+                                        ]
+                                        bookings.to_csv("bookings.csv", index=False)
+
+                                        # Log the transaction
+                                        log_transaction(
+                                            "Edit", new_room, new_date.strftime('%Y-%m-%d'), 
+                                            new_start_datetime, new_end_datetime, 
+                                            selected_booking['Booked By'], new_meeting_title, 
+                                            selected_booking['Contact Number'], password
+                                        )
+                                        
+                                        st.success("Booking updated successfully!")
                                 else:
-                                    # If the conflict is by the same user, allow the edit
-                                    bookings.loc[booking_to_edit, ['Room', 'Start Time', 'End Time', 'Meeting Title']] = [new_room, new_start_datetime, new_end_datetime, new_meeting_title]
+                                    # No conflict, proceed with the edit
+                                    bookings.loc[booking_to_edit, ['Date', 'Room', 'Start Time', 'End Time', 'Meeting Title']] = [
+                                        new_date.strftime('%Y-%m-%d'), 
+                                        new_room, 
+                                        new_start_datetime, 
+                                        new_end_datetime, 
+                                        new_meeting_title
+                                    ]
                                     bookings.to_csv("bookings.csv", index=False)
 
                                     # Log the transaction
-                                    log_transaction("Edit", new_room, selected_booking['Date'], new_start_datetime, new_end_datetime, selected_booking['Booked By'], new_meeting_title, selected_booking['Contact Number'], password)
+                                    log_transaction(
+                                        "Edit", new_room, new_date.strftime('%Y-%m-%d'), 
+                                        new_start_datetime, new_end_datetime, 
+                                        selected_booking['Booked By'], new_meeting_title, 
+                                        selected_booking['Contact Number'], password
+                                    )
                                     
                                     st.success("Booking updated successfully!")
-                            else:
-                                # No conflict, proceed with the edit
-                                bookings.loc[booking_to_edit, ['Room', 'Start Time', 'End Time', 'Meeting Title']] = [new_room, new_start_datetime, new_end_datetime, new_meeting_title]
-                                bookings.to_csv("bookings.csv", index=False)
-
-                                # Log the transaction
-                                log_transaction("Edit", new_room, selected_booking['Date'], new_start_datetime, new_end_datetime, selected_booking['Booked By'], new_meeting_title, selected_booking['Contact Number'], password)
-                                
-                                st.success("Booking updated successfully!")
                 
                 elif action == "Cancel Booking":
                     if st.button("Confirm Cancellation"):
