@@ -151,17 +151,17 @@ with tabs[0]:
         filtered_events = calendar_events  # Show all events if "All Rooms" is selected
     
     # Define available calendar views with descriptive labels
-    calendar_views = {
-        "For Desktop/Laptop": "dayGridMonth",  # Desktop/laptop view
-        "For Mobile": "listMonth",              # Mobile view
-    }
+    #calendar_views = {
+    #    "For Desktop/Laptop": "dayGridMonth",  # Desktop/laptop view
+    #    "For Mobile": "listMonth",              # Mobile view
+    #}
 
     # Allow the user to select the calendar view, using the descriptive labels
-    selected_view_label = st.selectbox("Select Calendar View", list(calendar_views.keys()))
-    selected_view = calendar_views[selected_view_label] 
+    #selected_view_label = st.selectbox("Select Calendar View", list(calendar_views.keys()))
+    #selected_view = calendar_views[selected_view_label] 
     # Default calendar options with Day Grid view
     calendar_options = {
-        "initialView": selected_view,  # Default to Day Grid Month view
+        "initialView": "dayGridMonth",  # Default to Day Grid Month view
         "headerToolbar": {
             "left": "prev,next today",  # Simplified navigation controls
             "center": "title",
