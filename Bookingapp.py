@@ -79,7 +79,7 @@ st.set_page_config(
 st.image(image_path, use_column_width=True)
 
 # Tabs setup
-tabs = st.tabs(["Calendar Overview", "Book a Room", "Edit or Cancel Booking"])
+tabs = st.tabs(["Booking Overview", "Book a Room", "Edit or Cancel Booking"])
 
 # Create events for the calendar view with room-specific display
 def create_calendar_events(bookings, room_colors, view_type):
@@ -151,7 +151,7 @@ with tabs[0]:
 
     # Optimize the views for mobile users with clear options
     calendar_views = {
-        "Month View (Desktop)": "dayGridMonth",
+        "Calendar View (Desktop)": "dayGridMonth",
         "List View (Mobile)": "listMonth",  # List view optimized for mobile
     }
 
