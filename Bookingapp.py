@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
+from streamlit.components.v1 import html
 
 # Define available meeting rooms
 meeting_rooms = ["DFO Conference Room (Max 15 Pax)", "I-Room (Max 5 Pax)"]
@@ -78,53 +79,94 @@ st.set_page_config(
 )
 st.image(image_path, use_column_width=True)
 
-# Create events for the calendar view with room-specific colors
-def create_calendar_events(bookings, room_colors):
+
+# Inject JavaScript to capture screen width
+js_code = """
+<script>
+    const width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    if (!window.initialized) {
+        window.initialized = true;
+        const streamlitPython = window.streamlitPyRuntime || window.streamlitRuntime;
+        streamlitPython.sendMessage("clientWidth", {width: width});
+    }
+</script>
+"""
+html(js_code, height=0, width=0)
+
+# Handle client width
+if "clientWidth" not in st.session_state:
+    st.session_state["clientWidth"] = 1200  # Default to a desktop screen width
+else:
+    st.session_state["clientWidth"] = st.session_state.get("clientWidth", 1200)
+
+# Set default view based on screen width
+default_view = "listMonth" if st.session_state["clientWidth"] < 768 else "dayGridMonth"
+
+# Tabs setup
+tabs = st.tabs(["Calendar Overview", "Book a Room", "Edit or Cancel Booking"])
+
+
+# Function to create calendar events
+def create_calendar_events(bookings, room_colors, view_type):
     calendar_events = []
     for index, booking in bookings.iterrows():
-        # Handle missing values with defaults
         title = booking.get('Meeting Title', 'Untitled Meeting')
         booked_by = booking.get('Booked By', 'Unknown')
         room = booking.get('Room', 'Unspecified Room')
+        contact_number = booking.get('Contact Number', 'N/A')  # Optional field for contact
         start_time = booking.get('Start Time')
         end_time = booking.get('End Time')
 
-        # Ensure start_time and end_time are properly formatted
         if start_time and end_time:
-            # Format start time (for visual clarity if needed, this can be omitted)
-            formatted_start_time = start_time.strftime('%I:%M %p').lstrip("0")
-            formatted_start_time = formatted_start_time.replace('AM', 'am').replace('PM', 'pm')
+            formatted_start_time = start_time.strftime('%I:%M %p').lstrip("0").lower()
+            formatted_end_time = end_time.strftime('%I:%M %p').lstrip("0").lower()
 
-            # Format the end time only (this is what will appear in the title and description)
-            formatted_end_time = end_time.strftime('%I:%M%p').lstrip("0")
-            formatted_end_time = formatted_end_time.replace('AM', 'am').replace('PM', 'pm')  
-
-            # Update the event title to only show the end time
-            event_title = f"m-{formatted_end_time}"
-
-            # Update the event description to show only the end time
-            event_description = f"Room: {room}\nEnd: {formatted_end_time}\nBooked by: {booked_by}"
+            if view_type == "dayGridMonth":  # Grid view
+                event_title = f"m-{formatted_end_time}"
+                event_description = ""
+            elif view_type == "listMonth":  # List view
+                event_title = f"{booked_by} ({contact_number}) - {title}"
+                event_description = (
+                    f"Room: {room}\n"
+                    f"Booked by: {booked_by}\n"
+                    f"Contact: {contact_number}\n"
+                    f"Meeting Title: {title}\n"
+                    f"Start: {formatted_start_time}\n"
+                    f"End: {formatted_end_time}"
+                )
+            else:
+                event_title = f"{title}"
+                event_description = ""
 
             event = {
                 "title": event_title,
                 "start": start_time.strftime('%Y-%m-%dT%H:%M:%S'),
                 "end": end_time.strftime('%Y-%m-%dT%H:%M:%S'),
                 "resourceId": room,
-                "backgroundColor": "#FFFFFF",  # White background for events
-                "borderColor": room_colors.get(room, "#3788d8"),  # Border color based on room
+                "backgroundColor": "#FFFFFF",
+                "borderColor": room_colors.get(room, "#3788d8"),
                 "description": event_description,
             }
             calendar_events.append(event)
     return calendar_events
 
-
-# Tabs setup
-tabs = st.tabs(["Calendar Overview", "Book a Room", "Edit or Cancel Booking"])
-
 # First Tab: Calendar Overview
 with tabs[0]:
     st.title("DFO Meeting Room Overview")
     st.subheader("View meeting room bookings at a glance")
+
+    # Allow user to override default view
+    calendar_views = {
+        "Month View (Desktop)": "dayGridMonth",
+        "List View (Mobile)": "listMonth",
+    }
+    selected_view_label = st.selectbox(
+        "Select Calendar View",
+        list(calendar_views.keys()),
+        index=0 if default_view == "dayGridMonth" else 1,
+        help="Switch between a detailed month overview for desktops or a list view for mobile devices.",
+    )
+    selected_view = calendar_views[selected_view_label]
 
     # Dropdown for selecting a room filter
     selected_room = st.radio(
@@ -133,14 +175,14 @@ with tabs[0]:
         index=0
     )
 
-    # Define room-specific colors (for border)
+    # Define room-specific colors
     room_colors = {
-        "DFO Conference Room (Max 15 Pax)": "#4CAF50",  # Green
-        "I-Room (Max 5 Pax)": "#2196F3",  # Blue
+        "DFO Conference Room (Max 15 Pax)": "#4CAF50",
+        "I-Room (Max 5 Pax)": "#2196F3",
     }
 
-    # Create the events based on the bookings
-    calendar_events = create_calendar_events(bookings, room_colors)
+    # Create calendar events
+    calendar_events = create_calendar_events(bookings, room_colors, selected_view)
 
     # Filter events based on the selected room
     if selected_room != "All Rooms":
@@ -148,78 +190,53 @@ with tabs[0]:
             event for event in calendar_events if event["resourceId"] == selected_room
         ]
     else:
-        filtered_events = calendar_events  # Show all events if "All Rooms" is selected
-    
-    # Define available calendar views with descriptive labels
-    #calendar_views = {
-    #    "For Desktop/Laptop": "dayGridMonth",  # Desktop/laptop view
-    #    "For Mobile": "listMonth",              # Mobile view
-    #}
+        filtered_events = calendar_events
 
-    # Allow the user to select the calendar view, using the descriptive labels
-    #selected_view_label = st.selectbox("Select Calendar View", list(calendar_views.keys()))
-    #selected_view = calendar_views[selected_view_label] 
-    # Default calendar options with Day Grid view
+    # Default calendar options
     calendar_options = {
-        "initialView": "dayGridMonth",  # Default to Day Grid Month view
+        "initialView": selected_view,
         "headerToolbar": {
-            "left": "prev,next today",  # Simplified navigation controls
+            "left": "prev,next today",
             "center": "title",
-            "right": ""  # Remove additional view options
+            "right": "",
         },
-        "editable": False,  # Prevent users from editing events directly
-        "selectable": False,  # Disable event selection
-        "eventColor": "#FFFFFF",  # White event background
+        "editable": False,
+        "selectable": False,
+        "eventColor": "#FFFFFF",
         "slotMinTime": "06:00:00",
         "slotMaxTime": "18:00:00",
     }
 
-
-    # Custom CSS for improved calendar styling
+    # Custom CSS for mobile
     custom_css = """
-        /* Remove the event dot */
-        .fc-event-dot {
-            display: none !important;  /* Forcefully hide the dot with !important */
-        }
-
         .fc-event {
-            font-size: 9px; /* Smaller font size for event title */
-            font-weight: bold; /* Remove bold from event title */
-            padding: 0px;    /* Remove padding around text */
-            margin: 0px;     /* Remove margin around the event */
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px;
+            margin: 1px;
             border-radius: 5px;
-            position: relative;
-            word-wrap: break-word;
             text-overflow: ellipsis;
             overflow: hidden;
-            white-space: normal; /* Allow text to wrap */
-            border-width: 2px !important; /* Make sure the border is visible */
-            border-style: groove !important; /* Border style for each event */
+            border-style: groove;
+            white-space: nowrap;
         }
-
         .fc-toolbar-title {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: bold;
             color: #333;
         }
-
-        /* Hover effect for better user experience */
         .fc-event:hover {
-            background-color: #f0f0f0;
+            background-color: #e8e8e8;
         }
-
-        /* Added for improved readability of event descriptions */
-        .fc-event-description {
-            font-size: 9px;
-            line-height: 1.1;
-            white-space: normal; /* Ensure description wraps if necessary */
-            padding: 0px 0px;
+        .fc {
+            font-size: 12px;
         }
     """
 
-    # Display the calendar with filtered events
+    # Display the calendar with filtered events and optimized view
     calendar_widget = calendar(events=filtered_events, options=calendar_options, custom_css=custom_css)
     st.write(calendar_widget)
+
 
 # Add custom CSS to hide specific parts of the JSON output
 st.markdown("""
