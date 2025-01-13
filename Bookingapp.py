@@ -79,7 +79,7 @@ st.set_page_config(
 st.image(image_path, use_column_width=True)
 
 # Tabs setup
-tabs = st.tabs(["Booking Overview", "Book a Room", "Edit or Cancel Booking"])
+tabs = st.tabs(["Book a Room", "Edit or Cancel Booking"])
 
 # Create events for the calendar view with room-specific display
 def create_calendar_events(bookings, room_colors, view_type):
@@ -129,7 +129,6 @@ def create_calendar_events(bookings, room_colors, view_type):
             }
             calendar_events.append(event)
     return calendar_events
-
 
 # First Tab: Calendar Overview
 with tabs[0]:
@@ -211,6 +210,13 @@ with tabs[0]:
             color: #333;
         }
 
+        /* Allow wrapping of text in List View events */
+        .fc-list-event {
+            white-space: normal; /* Allow text to wrap */
+            word-wrap: break-word; /* Break long words */
+            overflow: visible; /* Ensure full content is visible */
+            font-size: 12px; /* Adjust font size for readability */
+        }
         /* Event hover effect for better touch feedback */
         .fc-event:hover {
             background-color: #e8e8e8;
@@ -226,62 +232,8 @@ with tabs[0]:
     calendar_widget = calendar(events=filtered_events, options=calendar_options, custom_css=custom_css)
     st.write(calendar_widget)
 
+    # First Tab: Book a Room
 
-# Add custom CSS to hide specific parts of the JSON output
-st.markdown("""
-    <style>
-    /* Hide the collapsed icon (arrow) */
-    .stJson .collapsed-icon {
-        display: none !important;
-    }
-    
-    /* Hide the opening '{' */
-    .stJson .object-key-val span:nth-child(2) {
-        display: none !important;
-    }
-
-    /* Hide the ellipsis '...' */
-    .stJson .node-ellipsis {
-        display: none !important;
-    }
-
-    /* Hide the closing '}' */
-    .stJson .brace-row span {
-        display: none !important;
-    }
-    
-    /* Hide the opening '{' for object contents */
-    .stJson .object-key-val > span:first-child {
-        display: none !important;
-    }
-
-    /* Hide the entire variable-row element */
-    .variable-row {
-        display: none !important;
-    }
-    
-    /* Hide the string-value span */
-    .string-value {
-        display: none !important;
-    }
-
-    /* Hide the copy-to-clipboard container */
-    .copy-to-clipboard-container {
-        display: none !important;
-    }
-
-    /* Hide the object-key-val element */
-    .object-key-val {
-        display: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-
-
-# First Tab: Book a Room
-with tabs[1]:
     st.title("Meeting Room Booking System")
     st.subheader("Book a Room")
     today = datetime.today()
@@ -351,7 +303,59 @@ with tabs[1]:
                     st.success("Room booked successfully!")
 
 
-with tabs[2]:
+# Add custom CSS to hide specific parts of the JSON output
+st.markdown("""
+    <style>
+    /* Hide the collapsed icon (arrow) */
+    .stJson .collapsed-icon {
+        display: none !important;
+    }
+    
+    /* Hide the opening '{' */
+    .stJson .object-key-val span:nth-child(2) {
+        display: none !important;
+    }
+
+    /* Hide the ellipsis '...' */
+    .stJson .node-ellipsis {
+        display: none !important;
+    }
+
+    /* Hide the closing '}' */
+    .stJson .brace-row span {
+        display: none !important;
+    }
+    
+    /* Hide the opening '{' for object contents */
+    .stJson .object-key-val > span:first-child {
+        display: none !important;
+    }
+
+    /* Hide the entire variable-row element */
+    .variable-row {
+        display: none !important;
+    }
+    
+    /* Hide the string-value span */
+    .string-value {
+        display: none !important;
+    }
+
+    /* Hide the copy-to-clipboard container */
+    .copy-to-clipboard-container {
+        display: none !important;
+    }
+
+    /* Hide the object-key-val element */
+    .object-key-val {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
+
+with tabs[1]:
     st.title("Edit or Cancel Booking")
     
     # User input for searching existing bookings by password
