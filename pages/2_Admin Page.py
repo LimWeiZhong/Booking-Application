@@ -13,6 +13,16 @@ except FileNotFoundError:
         "Action", "Room", "Date", "Start Time", "End Time", "User", "Meeting Title", "Contact Number", "Password", "Timestamp"
     ])
 
+
+# Load bookings data
+try:
+    bookings = pd.read_csv("bookings.csv")
+    bookings['Start Time'] = pd.to_datetime(bookings['Start Time'])
+    bookings['End Time'] = pd.to_datetime(bookings['End Time'])
+    bookings['Contact Number'] = bookings['Contact Number'].astype(str)  # Ensure contact number is treated as string
+except FileNotFoundError:
+    bookings = pd.DataFrame(columns=["Room", "Date", "Start Time", "End Time", "Booked By", "Meeting Title", "Contact Number", "Password"])
+
 # Load blocked dates from blocked_dates.csv
 def load_blocked_dates():
     try:
@@ -45,14 +55,18 @@ if st.button("Login"):
         try:
             # Reload the transaction log to ensure it reflects the most recent updates
             transaction_log = pd.read_csv("transaction_log.csv")
+            booking_log = pd.read_csv("bookings.csv")
 
             if not transaction_log.empty:
                 # Ensure the Contact Number column is displayed without commas
                 if "Contact Number" in transaction_log.columns:
                     transaction_log["Contact Number"] = transaction_log["Contact Number"].astype(str)
+                    if "Contact Number" in booking_log.columns:
+                        booking_log["Contact Number"] = booking_log["Contact Number"].astype(str)
 
                 st.write("Below is the transaction history:")
                 st.dataframe(transaction_log, hide_index=True)
+                st.dataframe(booking_log, hide_index=True)
 
                 # Enable CSV download
                 csv = transaction_log.to_csv(index=False)
@@ -62,6 +76,13 @@ if st.button("Login"):
                     file_name="transaction_log.csv",
                     mime="text/csv"
                 )
+                csv = booking_log.to_csv(index=False)
+                st.download_button(
+                    label="Download Booking History",
+                    data=csv,
+                    file_name="bookings.csv",
+                    mime="text/csv"
+                )
             else:
                 st.info("The transaction history is currently empty.")
         except FileNotFoundError:
@@ -69,6 +90,7 @@ if st.button("Login"):
 
     else:
         st.error("Invalid password. Access denied.")
+
 
 # Blocked Dates Section
 st.subheader("Manage Blocked Dates")
