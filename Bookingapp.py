@@ -363,7 +363,8 @@ with tabs[1]:
 
     if password:
         # Search for existing bookings matching the password
-        matched_bookings = bookings[bookings['Password'] == password]
+        today = datetime.today().date()
+        matched_bookings = bookings[(bookings['Password'] == password) & (bookings['Date'] > today.strftime('%Y-%m-%d'))]
 
         if matched_bookings.empty:
             st.error("No matching bookings found. Please check the meeting password. If you forget your password, please contact Wei Zhong @ 90890631")
