@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from streamlit_calendar import calendar
 
 # Define available meeting rooms
-meeting_rooms = ["DFO Conference Room (Max 15 Pax)", "I-Room (Max 5 Pax)"]
+meeting_rooms = ["DFO Conference Room (Max 16 Pax)", "I-Room (Max 10 Pax)"]
 
 # Load bookings data
 try:
@@ -144,8 +144,8 @@ with tabs[0]:
 
     # Define room-specific colors (for border)
     room_colors = {
-        "DFO Conference Room (Max 15 Pax)": "#4CAF50",  # Green
-        "I-Room (Max 5 Pax)": "#2196F3",  # Blue
+        "DFO Conference Room (Max 16 Pax)": "#4CAF50",  # Green
+        "I-Room (Max 10 Pax)": "#2196F3",  # Blue
     }
 
     # Optimize the views for mobile users with clear options
